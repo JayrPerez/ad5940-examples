@@ -118,36 +118,182 @@ void AD5940_Main(void)
   uint32_t temp;
   
   AD5940PlatformCfg();
-  
   AD5940BIAStructInit(); /* Configure your parameters in this function */
-  
   AppBIAInit(AppBuff, APPBUFF_SIZE);    /* Initialize BIA application. Provide a buffer, which is used to store sequencer commands */
   AppBIACtrl(BIACTRL_START, 0);         /* Control BIA measurement to start. Second parameter has no meaning with this command. */
- 
+  
+  
+#if 1
+  AD5940_WriteReg(0x000002F0, 0x821FD );      //PMBW
+  AD5940_WriteReg(0x00000014, 0x0     );      //CLKSEL
+  AD5940_WriteReg(0x00000008, 0x440   );      //CLKCON0
+  AD5940_WriteReg(0x000001A8, 0x0     );      //ADCCON
+  AD5940_WriteReg(0x00000180, 0x37    );      //BUFSENCON
+  AD5940_WriteReg(0x0000038C, 0x5F3D04);      //ADCBUFCON
+  AD5940_WriteReg(0x00000000, 0x180040);      //AFECON
+  AD5940_WriteReg(0x000003E4, 0x0     );      //AFECON
+  AD5940_WriteReg(0x000000BC, 0x10    );      //HSOSCCON @datasheet
+  AD5940_WriteReg(0x00000044, 0x1     );      //ADCFILTERCON
+  AD5940_WriteReg(0x00000000, 0x180840);      //AFECON Optional
+  AD5940_WriteReg(0x000000FC, 0x7C    );      //HSTIACON @datasheet
+  AD5940_WriteReg(0x0000000C, 0x2FFFF );      //SWCON
+  AD5940_WriteReg(0x000000F0, 0x0     );      //HSRTIACON @datasheet
+  AD5940_WriteReg(0x000000E4, 0x3180  );      //LPTIASW0 @datasheet
+  AD5940_WriteReg(0x0000000C, 0x28141 );      //SWCON
+  AD5940_WriteReg(0x00000000, 0x380E40);      //AFECON
+  AD5940_WriteReg(0x00000030, 3355440 );      //under WGFCW, bits 0-23
+  AD5940_WriteReg(0x0000003C, 759     );      //WGAMPLITUDE
+  AD5940_WriteReg(0x00000010, 0x80E   );      //HSDACCON @datasheet
+  AD5940_WriteReg(0x00000014, 0x34    );      //WGCON
+  AD5940_WriteReg(0x00000000, 0x384E40);      //AFECON
+  AD5940_WriteReg(0x00000000, 0x384EC0);      //AFECON
+  AD5940_WriteReg(0x000001A8, 0x221424);      //ADCCON
+  AD5940_WriteReg(0x000000D0, 0x200091);      //DFTCON
+  AD5940_WriteReg(0x00000000, 0x384FC0);      //AFECON
+  AD5940_WriteReg(0x00000000, 0x39CFC0);      //AFECON
+  // Measuring Across RCAL here 
+  AD5940_WriteReg(0x00000000, 0x384FC0);      //AFECON
+  AD5940_WriteReg(0x00000000, 0x384EC0);      //AFECON
+  AD5940_WriteReg(0x000001A8, 0x200101);      //ADCCON
+  AD5940_WriteReg(0x00000000, 0x39CFC0);      //AFECON
+  // Measuring Across TIA here 
+  AD5940_WriteReg(0x00000000, 0x384FC0);      //AFECON
+  AD5940_WriteReg(0x00000000, 0x384EC0);      //AFECON
+  // Calculation of RTIA Impedance 
+  AD5940_WriteReg(0x000002F0, 0x821FD );      //PMBW Optional
+  AD5940_WriteReg(0x00000014, 0x0     );      //CLKSEL Optional
+  AD5940_WriteReg(0x00000008, 0x440   );      //CLKCON0 Optional
+  AD5940_WriteReg(0x000001A8, 0x0     );      //ADCCON Optional
+  AD5940_WriteReg(0x00000180, 0x37    );      //BUFSENCON Optional
+  AD5940_WriteReg(0x0000038C, 0x5F3D04);      //ADCBUFCON Optional
+  AD5940_WriteReg(0x00000000, 0x180040);      //AFECON Optional
+  AD5940_WriteReg(0x000003E4, 0x0     );      //AFECON Optional
+  AD5940_WriteReg(0x000000BC, 0x10    );      //HSOSCCON @datasheet
+  AD5940_WriteReg(0x00000044, 0x1     );      //ADCFILTERCON Optional
+  AD5940_WriteReg(0x00000000, 0x180840);      //AFECON Optional
+  AD5940_WriteReg(0x000000FC, 0x7C    );      //HSTIACON @datasheet Optional
+  AD5940_WriteReg(0x0000000C, 0x2FFFF );      //SWCON Optional
+  AD5940_WriteReg(0x000000F0, 0x0     );      //HSRTIACON @datasheet Optional
+  AD5940_WriteReg(0x000000E4, 0x3180  );      //LPTIASW0 @datasheet Optional
+  AD5940_WriteReg(0x0000000C, 0x22955 );      //SWCON
+  AD5940_WriteReg(0x00000000, 0x380E40);      //AFECON Optional
+  AD5940_WriteReg(0x00000030, 3355440 );      //under WGFCW, bits 0-23 Optional
+  AD5940_WriteReg(0x0000003C, 759     );      //WGAMPLITUDE
+  AD5940_WriteReg(0x00000010, 0x180F  );      //HSDACCON @datasheet
+  AD5940_WriteReg(0x00000014, 0x34    );      //WGCON Optional
+  AD5940_WriteReg(0x00000000, 0x384E40);      //AFECON Optional
+  AD5940_WriteReg(0x00000000, 0x384EC0);      //AFECON Optional
+  AD5940_WriteReg(0x000001A8, 0x241424);      //ADCCON
+  AD5940_WriteReg(0x000000D0, 0x200091);      //DFTCON Optional
+  AD5940_WriteReg(0x00000000, 0x384FC0);      //AFECON
+  AD5940_WriteReg(0x00000000, 0x39CFC0);      //AFECON
+  // Measuring Across ZLoad here 
+  AD5940_WriteReg(0x00000000, 0x384FC0);      //AFECON
+  AD5940_WriteReg(0x00000000, 0x384EC0);      //AFECON
+  AD5940_WriteReg(0x000001A8, 0x210101);      //ADCCON
+  AD5940_WriteReg(0x00000000, 0x39CFC0);      //AFECON
+  // Measuring Across TIA here 
+  AD5940_WriteReg(0x00000000, 0x384FC0);      //AFECON
+  AD5940_WriteReg(0x00000000, 0x384EC0);      //AFECON
+  // Calculation of RTIA Impedance 
+  
+  
+#elif 0
+  AD5940_WriteReg(REG_AFE_PMBW,         0x821FD );      //PMBW
+  AD5940_WriteReg(REG_AFECON_CLKSEL,    0x0     );      //CLKSEL
+  AD5940_WriteReg(REG_AFECON_CLKCON0,   0x440   );      //CLKCON0
+  AD5940_WriteReg(REG_AFE_ADCCON,       0x0     );      //ADCCON
+  AD5940_WriteReg(REG_AFE_BUFSENCON,    0x37    );      //BUFSENCON
+  AD5940_WriteReg(REG_AFE_ADCBUFCON,    0x5F3D04);      //ADCBUFCON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x180040);      //AFECON
+  AD5940_WriteReg(/*ADCBISCCON*/,       0x0     );      //AFECON
+  AD5940_WriteReg(REG_AFE_HPOSCCON,     0x10    );      //HSOSCCON @datasheet
+  AD5940_WriteReg(REG_AFE_ADCFILTERCON, 0x1     );      //ADCFILTERCON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x180840);      //AFECON Optional
+  AD5940_WriteReg(REG_AFE_HSTIACON,     0x7C    );      //HSTIACON @datasheet
+  AD5940_WriteReg(REG_AFE_SWCON,        0x2FFFF );      //SWCON
+  AD5940_WriteReg(REG_AFE_HSRTIACON,    0x0     );      //HSRTIACON @datasheet
+  AD5940_WriteReg(REG_AFE_LPTIASW0,     0x3180  );      //LPTIASW0 @datasheet
+  AD5940_WriteReg(REG_AFE_SWCON,        0x28141 );      //SWCON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x380E40);      //AFECON
+  AD5940_WriteReg(REG_AFE_WGFCW,        3355440 );      //under WGFCW, bits 0-23
+  AD5940_WriteReg(REG_AFE_WGAMPLITUDE,  759     );      //WGAMPLITUDE
+  AD5940_WriteReg(REG_AFE_HSDACCON,     0x80E   );      //HSDACCON @datasheet
+  AD5940_WriteReg(REG_AFE_WGCON,        0x34    );      //WGCON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384E40);      //AFECON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384EC0);      //AFECON
+  AD5940_WriteReg(REG_AFE_ADCCON,       0x221424);      //ADCCON
+  AD5940_WriteReg(REG_AFE_DFTCON,       0x200091);      //DFTCON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384FC0);      //AFECON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x39CFC0);      //AFECON
+  // Measuring Across RCAL here 
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384FC0);      //AFECON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384EC0);      //AFECON
+  AD5940_WriteReg(REG_AFE_ADCCON,       0x200101);      //ADCCON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x39CFC0);      //AFECON
+  // Measuring Across TIA here 
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384FC0);      //AFECON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384EC0);      //AFECON
+  // Calculation of RTIA Impedance 
+  AD5940_WriteReg(REG_AFE_PMBW,         0x821FD );      //PMBW Optional
+  AD5940_WriteReg(REG_AFECON_CLKSEL,    0x0     );      //CLKSEL Optional
+  AD5940_WriteReg(REG_AFECON_CLKCON0,   0x440   );      //CLKCON0 Optional
+  AD5940_WriteReg(REG_AFE_ADCCON,       0x0     );      //ADCCON Optional
+  AD5940_WriteReg(REG_AFE_BUFSENCON,    0x37    );      //BUFSENCON Optional
+  AD5940_WriteReg(REG_AFE_ADCBUFCON,    0x5F3D04);      //ADCBUFCON Optional
+  AD5940_WriteReg(REG_AFE_AFECON,       0x180040);      //AFECON Optional
+  AD5940_WriteReg(/*ADCBISCCON*/,       0x0     );      //AFECON Optional
+  AD5940_WriteReg(REG_AFE_HPOSCCON,     0x10    );      //HSOSCCON @datasheet Optional
+  AD5940_WriteReg(REG_AFE_ADCFILTERCON, 0x1     );      //ADCFILTERCON Optional
+  AD5940_WriteReg(REG_AFE_AFECON,       0x180840);      //AFECON Optional Optional
+  AD5940_WriteReg(REG_AFE_HSTIACON,     0x7C    );      //HSTIACON @datasheet Optional
+  AD5940_WriteReg(REG_AFE_SWCON,        0x2FFFF );      //SWCON Optional
+  AD5940_WriteReg(REG_AFE_HSRTIACON,    0x0     );      //HSRTIACON @datasheet Optional
+  AD5940_WriteReg(REG_AFE_LPTIASW0,     0x3180  );      //LPTIASW0 @datasheet Optional
+  AD5940_WriteReg(REG_AFE_SWCON,        0x22955 );      //SWCON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x380E40);      //AFECON Optional
+  AD5940_WriteReg(REG_AFE_WGFCW,        3355440 );      //under WGFCW, bits 0-23 Optional
+  AD5940_WriteReg(REG_AFE_WGAMPLITUDE,  759     );      //WGAMPLITUDE
+  AD5940_WriteReg(REG_AFE_HSDACCON,     0x180F  );      //HSDACCON @datasheet
+  AD5940_WriteReg(REG_AFE_WGCON,        0x34    );      //WGCON Optional
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384E40);      //AFECON Optional
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384EC0);      //AFECON Optional
+  AD5940_WriteReg(REG_AFE_ADCCON,       0x241424);      //ADCCON
+  AD5940_WriteReg(REG_AFE_DFTCON,       0x200091);      //DFTCON Optional
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384FC0);      //AFECON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x39CFC0);      //AFECON
+  // Measuring Across ZLoad here 
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384FC0);      //AFECON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384EC0);      //AFECON
+  AD5940_WriteReg(REG_AFE_ADCCON,       0x210101);      //ADCCON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x39CFC0);      //AFECON
+  // Measuring Across TIA here 
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384FC0);      //AFECON
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384EC0);      //AFECON
+  // Calculation of RTIA Impedance 
+#endif
+  
+  
+  
+  
   while(1)
   {
     /* Check if interrupt flag which will be set when interrupt occurred. */
-    if(AD5940_GetMCUIntFlag())
-    {
-      IntCount++;
-      AD5940_ClrMCUIntFlag(); /* Clear this flag */
-      temp = APPBUFF_SIZE;
-      AppBIAISR(AppBuff, &temp); /* Deal with it and provide a buffer to store data we got */
-      BIAShowResult(AppBuff, temp); /* Show the results to UART */
-
-      if(IntCount == 240)
-      {
-        IntCount = 0;
-        //AppBIACtrl(BIACTRL_SHUTDOWN, 0);
-      }
-    }
-    count++;
-    if(count > 1000000)
-    {
-      count = 0;
-      //AppBIAInit(0, 0);    /* Re-initialize BIA application. Because sequences are ready, no need to provide a buffer, which is used to store sequencer commands */
-      //AppBIACtrl(BIACTRL_START, 0);          /* Control BIA measurement to start. Second parameter has no meaning with this command. */
-    }
+//    if(AD5940_GetMCUIntFlag())
+//    {
+//      IntCount++;
+//      AD5940_ClrMCUIntFlag(); /* Clear this flag */
+//      temp = APPBUFF_SIZE;
+//      AppBIAISR(AppBuff, &temp); /* Deal with it and provide a buffer to store data we got */
+//      BIAShowResult(AppBuff, temp); /* Show the results to UART */
+//    }
+//    count++;
+//    if(count > 1000000)
+//    {
+//      count = 0;
+//      //AppBIAInit(0, 0);    /* Re-initialize BIA application. Because sequences are ready, no need to provide a buffer, which is used to store sequencer commands */
+//      //AppBIACtrl(BIACTRL_START, 0);          /* Control BIA measurement to start. Second parameter has no meaning with this command. */
+//    }
   }
 }
 
