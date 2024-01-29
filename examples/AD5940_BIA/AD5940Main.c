@@ -24,6 +24,7 @@ Analog Devices Software License Agreement.
 #include "string.h"
 #include "math.h"
 #include "BodyImpedance.h"
+#include "CalibrationMeasurement_FourWire.h"
 
 #define APPBUFF_SIZE 512
 uint32_t AppBuff[APPBUFF_SIZE];
