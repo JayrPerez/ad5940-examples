@@ -2196,9 +2196,6 @@
             <name>$PROJ_DIR$\..\AD5940Main.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\BodyImpedance.c</name>
-        </file>
-        <file>
             <name>$PROJ_DIR$\..\CalibrationMeasurement_FourWire.c</name>
         </file>
         <file>
