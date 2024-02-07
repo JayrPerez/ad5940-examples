@@ -18,6 +18,9 @@ void AD5940Juul_Initialization(void)
   AD5940_WriteReg(REG_AFE_HSRTIACON,    0x0     );                      // Use 200 Ohm RTIA, No Capacitance
   AD5940_WriteReg(REG_AFE_LPTIASW0,     0x3180  );                      // Initialize LPTIA
   
+  AD5940_INTCCfg(AFEINTC_1, AFEINTSRC_DFTRDY, bTRUE);                   /* Enable SINC2 Interrupt in INTC1 */
+                                                                        // Enables interrupt which would indicate DFT (DFTREAL & DFTIMAG) is ready for reading
+  
   /* Removed optional lines */
   /* ADCBISCON register not present in data sheet/register library */
   /* Reset values for ADCCON, BUFSENCON and ADCBISCON are 0x0, 0x37 and 0x0 respectively */
@@ -38,17 +41,21 @@ void AD5940Juul_RtiaACMeasurement(int32_t RtiaAcCalibrationValues[4])
   AD5940_WriteReg(REG_AFE_AFECON,       0x39CFC0);                      // Start ADC Conversion
   
   /* Measuring Across RCAL */
+  while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE);    // Wait for DFT interrupt which would indicate DFT is ready to be read
   RtiaAcCalibrationValues[0] = AD5940_ReadAfeResult(AFERESULT_DFTREAL); // Reads register DFTREAL to get raw DFT real value
   RtiaAcCalibrationValues[1] = AD5940_ReadAfeResult(AFERESULT_DFTIMAGE);// Reads register DFTIMAG to get raw DFT imaginary value
   AD5940_WriteReg(REG_AFE_AFECON,       0x384FC0);                      // ADC Idle
+  AD5940_INTCClrFlag(AFEINTSRC_DFTRDY);                                 // Clears the recent DFT interrupt flag
   
   AD5940_WriteReg(REG_AFE_ADCCON,       0x200101);                      // PGA Gain = 1, ADC Across HPTIA P-N
   AD5940_WriteReg(REG_AFE_AFECON,       0x39CFC0);                      // Start ADC Conversion
   
   /* Measuring Across TIA */
+  while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE);    // Wait for DFT interrupt which would indicate DFT is ready to be read
   RtiaAcCalibrationValues[2] = AD5940_ReadAfeResult(AFERESULT_DFTREAL); // Reads register DFTREAL to get raw DFT real value
   RtiaAcCalibrationValues[3] = AD5940_ReadAfeResult(AFERESULT_DFTIMAGE);// Reads register DFTIMAG to get raw DFT imaginary value
   AD5940_WriteReg(REG_AFE_AFECON,       0x384FC0);                      // ADC Idle
+  AD5940_INTCClrFlag(AFEINTSRC_DFTRDY);                                 // Clears the recent DFT interrupt flag
 }
 
 void AD5940Juul_LoadMeasurement(int32_t LoadMeasurementValues[4])
@@ -62,17 +69,21 @@ void AD5940Juul_LoadMeasurement(int32_t LoadMeasurementValues[4])
   AD5940_WriteReg(REG_AFE_AFECON,       0x39CFC0);                      // Start ADC Conversion
   
   /* Measuring Across ZLoad here */
+  while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE);    // Wait for DFT interrupt which would indicate DFT is ready to be read
   LoadMeasurementValues[0] = AD5940_ReadAfeResult(AFERESULT_DFTREAL);   // Reads register DFTREAL to get raw DFT real value
   LoadMeasurementValues[1] = AD5940_ReadAfeResult(AFERESULT_DFTIMAGE);  // Reads register DFTIMAG to get raw DFT imaginary value
   AD5940_WriteReg(REG_AFE_AFECON,       0x384FC0);                      // ADC Idle
+  AD5940_INTCClrFlag(AFEINTSRC_DFTRDY);                                 // Clears the recent DFT interrupt flag
   
   AD5940_WriteReg(REG_AFE_ADCCON,       0x210101);                      // PGA Gain = 1.5, ADC Across HPTIA P-N
   AD5940_WriteReg(REG_AFE_AFECON,       0x39CFC0);                      // Start ADC Conversion
   
   /* Measuring Across TIA here */
+  while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE);    // Wait for DFT interrupt which would indicate DFT is ready to be read
   LoadMeasurementValues[2] = AD5940_ReadAfeResult(AFERESULT_DFTREAL);   // Reads register DFTREAL to get raw DFT real value
   LoadMeasurementValues[3] = AD5940_ReadAfeResult(AFERESULT_DFTIMAGE);  // Reads register DFTIMAG to get raw DFT imaginary value
   AD5940_WriteReg(REG_AFE_AFECON,       0x384FC0);                      // ADC Idle
+  AD5940_INTCClrFlag(AFEINTSRC_DFTRDY);                                 // Clears the recent DFT interrupt flag
 }
 
 /** Guide for Value Designation (Use Formula as Basis):
