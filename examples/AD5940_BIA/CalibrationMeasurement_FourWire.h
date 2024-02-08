@@ -3,12 +3,11 @@
 #include "ad5940.h"
 
 #include <math.h>
+#include <stdio.h>
 
 #define MAG_PHASE                       1     /* set to 1 to include calculate Magnitude and Phase */
 
-#define MATH_PI                         3.1416
-
-#define RCAL_VALUE                      100
+#define RCAL_VALUE                      96.36
 
 #define PGA_GAIN_1                      1     /* ADC PGA Gain of 1   */
 #define PGA_GAIN_1P5                    1.5   /* ADC PGA Gain of 1.5 */
@@ -21,11 +20,14 @@ void AD5940Juul_Initialization(void);
 void AD5940Juul_RtiaACMeasurement(int32_t RtiaAcCalibration_RawValues[4]);
 void AD5940Juul_LoadMeasurement(int32_t LoadMeasurement_RawValues[4]);
 
-double AD5940Juul_GetComplexMag(int32_t FinalMultiplier, \
-                                int32_t RealNumerator,   int32_t ImagNumerator, \
-                                int32_t RealDenominator, int32_t ImagDenominator);
+double AD5940Juul_GetComplexMag(double FinalMultiplier, \
+                                double RealNumerator,   double ImagNumerator, \
+                                double RealDenominator, double ImagDenominator);
 
-double AD5940Juul_GetComplexPhase(int32_t Real1, int32_t Real2, \
-                                  int32_t Imag1, int32_t Imag2);
+double AD5940Juul_GetComplexPhase(double Real1, double Real2, \
+                                  double Imag1, double Imag2);
+
+double AD5940Juul_GetComplexPhase2(double Real1, double Real2, \
+                                  double Imag1, double Imag2, double Theta);
 
 #endif
