@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<workspace>
+    <project>
+        <path>$WS_DIR$\AD5940_BIA\ADICUP3029\AD5940_BIA.ewp</path>
+    </project>
+    <batchBuild>
+        <batchDefinition>
+            <name>Debug</name>
+            <member>
+                <project>AD5940_ADC</project>
+                <configuration>Debug</configuration>
+            </member>
+        </batchDefinition>
+    </batchBuild>
+</workspace>
