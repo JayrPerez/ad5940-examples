@@ -5,15 +5,21 @@
 /* Configurations for Calibration Routine */
 AppJuulCfg_Type AppJuulCfg = 
 {
-  .HighSpeedOscClock            = HSOSCCLK_16MHZ,       // Set for HPOSCCON value
-  .ADCFilterSampleRate          = ADCSAMPLERATE_800KHZ, // Set for ADCFILTERCON
-  .RcalValue                    = 100,                // Set value for Rcal connected to board
-  .RTIAValue                    = RTIA_VAL_200,         // Set value for RTIA among available options
-  .ExcitationFrequency          = 6710890,              // For 100 KHz Excitation Frequency: d'3355440 at 32 MHz, d'6710890 at 16 MHz
-  .PGAGain_Calibrate_Rcal       = PGA_GAIN_2,           // Set PGA Gain for Rcal measurement during RTIA AC Calibration
-  .PGAGain_Calibrate_Rtia       = PGA_GAIN_1,           // Set PGA Gain for RTIA measurement during RTIA AC Calibration
-  .PGAGain_LoadMeas_Load        = PGA_GAIN_9,           // Set PGA Gain for Load measurement during Load Measurement
-  .PGAGain_LoadMeas_Rtia        = PGA_GAIN_1P5,         // Set PGA Gain for RTIA measurement during Load Measurement
+  .HighSpeedOscClock            = HSOSCCLK_16MHZ,       // 
+  .ADCFilterSampleRate          = ADCSAMPLERATE_800KHZ, // 
+  .RcalValue                    = 100,                  // 
+  .RTIAValue                    = RTIA_200,             // 
+  .WaveGenFreq                  = 100000,               // 
+  .WaveGenAmp_Calibrate         = 600,                  // 
+  .WaveGenAmp_LoadMeas          = 15,                   // 
+  .InAmp_Calibrate              = INAMP_GAIN_2,         // 
+  .InAmp_LoadMeas               = INAMP_GAIN_0P25,      // 
+  .Atten_Calibrate              = DAC_ATTEN_DIS,        // 
+  .Atten_LoadMeas               = DAC_ATTEN_EN,         // 
+  .PGAGain_Calibrate_Rcal       = PGA_GAIN_2,           // 
+  .PGAGain_Calibrate_Rtia       = PGA_GAIN_1,           // 
+  .PGAGain_LoadMeas_Load        = PGA_GAIN_9,           // 
+  .PGAGain_LoadMeas_Rtia        = PGA_GAIN_1P5,         // 
 };
 
 void AD5940_Main(void)
