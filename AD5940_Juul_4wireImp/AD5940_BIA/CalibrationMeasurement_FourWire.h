@@ -5,6 +5,10 @@
 #include <math.h>
 #include <stdio.h>
 
+/* Stage of Calibration Routine */
+#define RTIA_AC_CAL_STAGE               0
+#define LOAD_MEAS_STAGE                 1
+
 /* Register bit set all to zero */
 #define REGISTER_ALL_ZERO               0x00000000
 
@@ -20,8 +24,8 @@
 #define HSOSCCLK_16MHZ                  1       // 16 MHz
 
 /* High Speed Oscillator Clock Frequency Value */
-#define HSOSCCLK_VAL_32MHZ                32000000        // 32 MHz
-#define HSOSCCLK_VAL_16MHZ                16000000        // 16 MHz
+#define HSOSCCLK_VAL_32MHZ              32000000        // 32 MHz
+#define HSOSCCLK_VAL_16MHZ              16000000        // 16 MHz
 
 /* Sampling Rate for ADC Filter */
 #define ADCSAMPLERATE_800KHZ            0       // 800 kHz
@@ -105,41 +109,45 @@
 #define DAC_ATTEN_DIS_GAINVAL           1       // Disabled -> Gain = 1
 #define DAC_ATTEN_EN_GAINVAL            0.2       // Enabled -> Gain = 0.2
 
-/* Available Configurable Values */
+/* Struct for Configurations for Measurment */
 typedef struct
 {
   uint8_t HighSpeedOscClock;            // Frequency value for the High Speed Oscillator Clock
   uint8_t ADCFilterSampleRate;          // Sampling rate for the ADC Filter
-  uint32_t RcalValue;                   // Set value for Rcal
-  uint8_t RTIAValue;                    // Set value for RTIA
+  uint8_t RtiaValue;                    // Set value for RTIA
   uint32_t WaveGenFreq;                 // Set Excitation Frequency of Waveform Generator
-  uint32_t WaveGenAmp_Calibrate;        // Set Excitation Amplitude of Waveform Generator during RTIA AC Calibration
-  uint32_t WaveGenAmp_LoadMeas;         // Set Excitation Amplitude of Waveform Generator during Load Measurement
-  uint8_t InAmp_Calibrate;              // Set InAmp Gain value during RTIA AC Calibration
-  uint8_t InAmp_LoadMeas;               // Set InAmp Gain value during Load Measurement
-  uint8_t Atten_Calibrate;              // Set DAC Attenuator value during RTIA AC Calibration
-  uint8_t Atten_LoadMeas;               // Set DAC Attenuator value during Load Measurement
-  uint32_t PGAGain_Calibrate_Rcal;      // Set PGA Gain for Rcal measurement during RTIA AC Calibration
-  uint32_t PGAGain_Calibrate_Rtia;      // Set PGA Gain for RTIA measurement during RTIA AC Calibration
-  uint32_t PGAGain_LoadMeas_Load;       // Set PGA Gain for Load measurement during Load Measurement
-  uint32_t PGAGain_LoadMeas_Rtia;       // Set PGA Gain for RTIA measurement during Load Measurement
-}AppJuulCfg_Type;
+  uint32_t WaveGenAmp;
+  uint8_t InAmp;
+  uint8_t Atten;
+  uint32_t PGAGain_Load;
+  uint32_t PGAGain_Rtia;
+  SWMatrixCfg_Type SwitchCfg;
+}JuulMeasCfg_Type;
+
+/* Struct for Values for Calculations */
+typedef struct
+{
+  uint8_t Stage;
+  double RcalValue;
+  int32_t DFTLoadReal;
+  int32_t DFTLoadImag;
+  int32_t DFTRtiaReal;
+  int32_t DFTRtiaImag;
+  double RtiaMag;
+  double RtiaPhase;
+  double LoadMag;
+  double LoadPhase;
+}JuulValues_Type;
 
 /* Function Declarations */
-void AD5940Juul_Initialization(AppJuulCfg_Type *pJuulCfg);
-void AD5940Juul_RtiaACMeasurement(int32_t RtiaAcCalibration_RawValues[4], AppJuulCfg_Type *pJuulCfg);
-void AD5940Juul_LoadMeasurement(int32_t LoadMeasurement_RawValues[4], AppJuulCfg_Type *pJuulCfg);
-void AD5940Juul_CalculateShowResult(int32_t RtiaAcCalibration_RawValues[4], int32_t LoadMeasurement_RawValues[4], AppJuulCfg_Type *pJuulCfg);
-
+void AD5940Juul_Initialization(void);
+void AD5940Juul_Measure(JuulMeasCfg_Type *pJuulCfg, JuulValues_Type *pJuulVal);
+void AD5940Juul_CalculateDFTResults(JuulMeasCfg_Type *pJuulCfg, JuulValues_Type *pJuulVal);
+void AD5940Juul_Revert2sComplement(JuulValues_Type *pJuulValues);
 void AD5940Juul_HSOscillatorCtrl(uint8_t HSOscClk);
 void AD5940Juul_ADCFilterCtrl(uint8_t ADCFltrSampleRate);
 void AD5940Juul_HSRtiaCtrl(uint8_t RTIAValue);
 void AD5940Juul_WaveGenFreqCtrl(uint32_t WaveGenFreq, uint8_t HighSpeedOscClock);
 void AD5940Juul_WaveGenAmpCtrl(uint32_t WaveGenAmp, uint8_t InAmp, uint8_t Atten);
-
-void AD5940Juul_Revert2sComplement(int32_t InputValue[4]);
-double AD5940Juul_GetComplexMag(double FinalMultiplier, double RealNumerator,   double ImagNumerator, double RealDenominator, double ImagDenominator);
-double AD5940Juul_GetComplexPhaseCalibrate(double Real1, double Real2, double Imag1, double Imag2);
-double AD5940Juul_GetComplexPhaseMeasure(double Real1, double Real2, double Imag1, double Imag2, double Theta);
 
 #endif
