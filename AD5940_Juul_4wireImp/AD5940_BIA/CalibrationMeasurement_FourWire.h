@@ -109,6 +109,14 @@
 #define DAC_ATTEN_DIS_GAINVAL           1       // Disabled -> Gain = 1
 #define DAC_ATTEN_EN_GAINVAL            0.2       // Enabled -> Gain = 0.2
 
+/* HSDACCON Register Bit Position */
+#define HSDACCON_ATTENEN                0
+#define HSDACCON_RATE                   1       // from Bit 1-8
+#define HSDACCON_BW50KEN                9
+#define HSDACCON_BW100KEN               10
+#define HSDACCON_BW250KEN               11
+#define HSDACCON_INAMPGNMDE             12
+
 /* Struct for Configurations for Measurment */
 typedef struct
 {
@@ -149,5 +157,6 @@ void AD5940Juul_ADCFilterCtrl(uint8_t ADCFltrSampleRate);
 void AD5940Juul_HSRtiaCtrl(uint8_t RTIAValue);
 void AD5940Juul_WaveGenFreqCtrl(uint32_t WaveGenFreq, uint8_t HighSpeedOscClock);
 void AD5940Juul_WaveGenAmpCtrl(uint32_t WaveGenAmp, uint8_t InAmp, uint8_t Atten);
+void AD5940Juul_DACCtrl(uint8_t InAmp, uint8_t Atten);
 
 #endif

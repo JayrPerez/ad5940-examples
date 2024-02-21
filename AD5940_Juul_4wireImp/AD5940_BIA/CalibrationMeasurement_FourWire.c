@@ -34,20 +34,30 @@ void AD5940Juul_Measure(JuulMeasCfg_Type *pJuulCfg, JuulValues_Type *pJuulVal)
   AD5940Juul_HSRtiaCtrl(pJuulCfg->RtiaValue);                           // Use 200 Ohm RTIA, No Capacitance
   AD5940_WriteReg(REG_AFE_LPTIASW0,     0x3180  );                      // Initialize LPTIA
   AD5940_INTCCfg(AFEINTC_1, AFEINTSRC_DFTRDY, bTRUE);                   // Enables interrupt which would indicate DFT (DFTREAL & DFTIMAG) is ready for reading
-
+  
   /* Configure AD5940 for RCAL measurement */
   AD5940_SWMatrixCfgS(&pJuulCfg->SwitchCfg);                            // Connect across Rcal
   AD5940Juul_WaveGenFreqCtrl(pJuulCfg->WaveGenFreq, pJuulCfg->HighSpeedOscClock);                                     // 3355440 for 100 KHz Excitation Frequency; d’6710890 for 16 MHz Clk //SINEFCW in WGFCW, bits 0-23
   AD5940Juul_WaveGenAmpCtrl(pJuulCfg->WaveGenAmp, pJuulCfg->InAmp, pJuulCfg->Atten);                            // 600 mV Excitation Voltage
-  AD5940_WriteReg(REG_AFE_HSDACCON, 0x80E);                             // InAmp = 2, Atten = False, 0x1B Update Rate fro HS/HP
+  
+//  if(pJuulVal->Stage == RTIA_AC_CAL_STAGE)
+//  {
+//    AD5940_WriteReg(REG_AFE_HSDACCON,     0x80E   );                      // InAmp = 2, Atten = False, 0x1B Update Rate fro HS/HP
+//  }
+//  else
+//  {
+//    AD5940_WriteReg(REG_AFE_HSDACCON,     0x180F  );                      // InAmp = 0.25, Atten = True, 0x1B Update Rate for HS/HP
+//  }
+  AD5940Juul_DACCtrl(pJuulCfg->InAmp, pJuulCfg->Atten); 
+  
   AD5940_WriteReg(REG_AFE_WGCON, 0x34);                                 // Sine Wave
   
-  temp_PGAGain = 0x201424 | (pJuulCfg->PGAGain_Load << 16);   // Uses set .PGAGain for Rcal during RTIA AC calibration
+  temp_PGAGain = 0x201424 | (pJuulCfg->PGAGain_Load << 16);             // Uses set .PGAGain for Rcal during RTIA AC calibration
   AD5940_WriteReg(REG_AFE_ADCCON, temp_PGAGain);                        // Adds PGA Gain to fixed config of ADC Across Excitation Amp P-N and set register to the value
-  AD5940_WriteReg(REG_AFE_DFTCON, 0x200091);                            // ADC Raw Data, 2048 Sampling
-  AD5940_WriteReg(REG_AFE_AFECON, 0x184FC0);                            // ADC Idle
-  AD5940_Delay10us(20);                                                 // Added slight delay, referenced from BIA example
-  AD5940_WriteReg(REG_AFE_AFECON, 0x19CFC0);                            // Start ADC Conversion (has a disabled dc DAC buffer)
+  AD5940_WriteReg(REG_AFE_DFTCON,       0x200091);                      // ADC Raw Data, 2048 Sampling
+  AD5940_WriteReg(REG_AFE_AFECON,       0x384FC0);                      // ADC Idle
+  AD5940_Delay10us(25);
+  AD5940_WriteReg(REG_AFE_AFECON,       0x19CFC0);                      // Start ADC Conversion
   while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE);    // Wait for DFT interrupt which would indicate DFT is ready to be read
   AD5940_WriteReg(REG_AFE_AFECON, 0x184FC0);                            // ADC Idle
   AD5940_INTCClrFlag(AFEINTSRC_DFTRDY);                                 // Clears the recent DFT interrupt flag
@@ -89,23 +99,27 @@ void AD5940Juul_CalculateDFTResults(JuulMeasCfg_Type *pJuulCfg, JuulValues_Type 
   /* Calculation for Magnitude and Phase */
   switch(pJuulVal->Stage)
   {
-  case RTIA_AC_CAL_STAGE:       // Calculation for RTIA AC Calibration
-    temp  = sqrt((Rtia_Real * Rtia_Real) + (Rtia_Imag * Rtia_Imag));
-    temp /= sqrt((Load_Real * Load_Real) + (Load_Imag * Load_Imag));
-    pJuulVal->RtiaMag = pJuulVal->RcalValue * temp;     // RTIA Magnitude
-    
-    temp = (Load_Real + Rtia_Real) / (Load_Imag + Rtia_Imag);
-    pJuulVal->RtiaPhase = atan(temp) * 180 / MATH_PI;   // RTIA Phase
+    case RTIA_AC_CAL_STAGE:       // Calculation for RTIA AC Calibration
+      temp  = sqrt((Rtia_Real * Rtia_Real) + (Rtia_Imag * Rtia_Imag));
+      temp /= sqrt((Load_Real * Load_Real) + (Load_Imag * Load_Imag));
+      pJuulVal->RtiaMag = pJuulVal->RcalValue * temp;     // RTIA Magnitude
+      
+      temp = (Load_Imag + Rtia_Imag) / (Load_Real + Rtia_Real);
+      pJuulVal->RtiaPhase = atan(temp) * 180 / MATH_PI;   // RTIA Phase
     break;
     
-  case LOAD_MEAS_STAGE:         // Calculation for Load Measurement
-    temp  = sqrt((Load_Real * Load_Real) + (Load_Imag * Load_Imag));
-    temp /= sqrt((Rtia_Real * Rtia_Real) + (Rtia_Imag * Rtia_Imag));
-    pJuulVal->LoadMag = pJuulVal->RtiaMag * temp;       // Load Magnitude
+    case LOAD_MEAS_STAGE:         // Calculation for Load Measurement
+      temp  = sqrt((Load_Real * Load_Real) + (Load_Imag * Load_Imag));
+      temp /= sqrt((Rtia_Real * Rtia_Real) + (Rtia_Imag * Rtia_Imag));
+      pJuulVal->LoadMag = pJuulVal->RtiaMag * temp;       // Load Magnitude
+      
+      temp = (Load_Imag + Rtia_Imag) / (Load_Real + Rtia_Real);
+      temp = atan(temp) * 180 / MATH_PI;
+      pJuulVal->LoadPhase = temp - pJuulVal->RtiaPhase;         // Load Phase
+    break;
     
-    temp = (Load_Real + Rtia_Real) / (Load_Imag + Rtia_Imag);
-    temp = atan(temp) * 180 / MATH_PI;
-    pJuulVal->LoadPhase -= pJuulVal->RtiaPhase;         // Load Phase
+    default:
+      // Do nothing
     break;
   }
 }
@@ -167,12 +181,16 @@ void AD5940Juul_ADCFilterCtrl(uint8_t ADCFltrSampleRate)
   
   switch(ADCFltrSampleRate)
   {
-  case ADCSAMPLERATE_800KHZ:
-    register_input = ADCFILTERCON_ADCSAMPLERATE;
+    case ADCSAMPLERATE_800KHZ:
+      register_input = ADCFILTERCON_ADCSAMPLERATE;
     break;
     
-  case ADCSAMPLERATE_1P6MHZ:
-    register_input = (1L<<1);
+    case ADCSAMPLERATE_1P6MHZ:
+      register_input = (1L<<1);
+    break;
+    
+    default:
+      // Do nothing
     break;
   }
   
@@ -195,12 +213,16 @@ void AD5940Juul_WaveGenFreqCtrl(uint32_t WaveGenFreq, uint8_t HighSpeedOscClock)
   
   switch(HighSpeedOscClock)
   {
-  case HSOSCCLK_32MHZ:
-    register_input = WaveGenFreq * (1L<<30) / HSOSCCLK_VAL_32MHZ;
+    case HSOSCCLK_32MHZ:
+      register_input = (uint64_t) WaveGenFreq * (1L<<30) / HSOSCCLK_VAL_32MHZ;
     break;
     
-  case HSOSCCLK_16MHZ:
-    register_input = WaveGenFreq * (1L<<30) / HSOSCCLK_VAL_16MHZ;
+    case HSOSCCLK_16MHZ:
+      register_input = (uint64_t) WaveGenFreq * (1L<<30) / HSOSCCLK_VAL_16MHZ;
+    break;
+    
+    default:
+      // Do nothing
     break;
   }
   
@@ -216,25 +238,62 @@ void AD5940Juul_WaveGenAmpCtrl(uint32_t WaveGenAmp, uint8_t InAmp, uint8_t Atten
   
   switch(InAmp)
   {
-  case INAMP_GAIN_2:
-    register_input /= INAMP_GAIN_VAL_2;
+    case INAMP_GAIN_2:
+      register_input /= INAMP_GAIN_VAL_2;
     break;
     
-  case INAMP_GAIN_0P25:
-    register_input /= INAMP_GAIN_VAL_0P25;
+    case INAMP_GAIN_0P25:
+      register_input /= INAMP_GAIN_VAL_0P25;
+    break;
+    
+    default:
+      // Do nothing
     break;
   }
   
   switch(Atten)
   {
-  case DAC_ATTEN_DIS:
-    register_input /= DAC_ATTEN_DIS_GAINVAL;
+    case DAC_ATTEN_DIS:
+      register_input /= DAC_ATTEN_DIS_GAINVAL;
     break;
     
-  case DAC_ATTEN_EN:
-    register_input /= DAC_ATTEN_EN_GAINVAL;
+    case DAC_ATTEN_EN:
+      register_input /= DAC_ATTEN_EN_GAINVAL;
+    break;
+    
+    default:
+      // Do nothing
     break;
   }
   
   AD5940_WriteReg(REG_AFE_WGAMPLITUDE, (uint32_t) register_input);
 }
+
+void AD5940Juul_DACCtrl(uint8_t InAmp, uint8_t Atten)
+{
+  uint32_t register_input = REGISTER_ALL_ZERO;
+  
+  register_input |= 7 << HSDACCON_RATE;
+  register_input |= bTRUE << HSDACCON_BW250KEN;
+  
+  if(INAMP_GAIN_0P25 == InAmp)
+  {
+    register_input |= bTRUE << HSDACCON_INAMPGNMDE;
+  }
+  
+  if(DAC_ATTEN_EN == Atten)
+  {
+    register_input |= bTRUE << HSDACCON_ATTENEN;
+  }
+  
+  AD5940_WriteReg(REG_AFE_HSDACCON, register_input);
+}
+
+
+
+
+
+
+
+
+
