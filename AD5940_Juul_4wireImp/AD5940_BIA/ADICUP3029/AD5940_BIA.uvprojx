@@ -410,9 +410,9 @@
               <FilePath>..\AD5940Main.c</FilePath>
             </File>
             <File>
-              <FileName>BodyImpedance.c</FileName>
+              <FileName>CalibrationMeasurement_FourWire.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\BodyImpedance.c</FilePath>
+              <FilePath>..\CalibrationMeasurement_FourWire.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -1,307 +1,362 @@
 #include "CalibrationMeasurement_FourWire.h"
 
-void AD5940Juul_Initialization(AppJuulCfg_Type *pJuulCfg)
+/** Initialize Switches */
+SWMatrixCfg_Type SWMatCfg_Init = 
 {
-  AD5940_HWReset();                                                     // Performs hardware reset
-  AD5940_Initialize();                                                  // According to data sheet, this is needed whenever a reset is performed
+  .Dswitch = SWD_OPEN,
+  .Pswitch = SWP_OPEN,
+  .Nswitch = SWN_OPEN,
+  .Tswitch = SWT_OPEN | SWT_TRTIA,      // Connects T9 Switch
+};
+
+/** Initialize for the Calibration Routine */
+void AD5940Juul_Initialization(void)
+{
+  AD5940_HWReset();                                     // Do hardware reset
+  AD5940_Initialize();                                  // Needed after reset
   
-  AD5940_WriteReg(REG_AFE_PMBW,         0x821FD );                      // High Power Mode
-  AD5940_WriteReg(REG_AFECON_CLKSEL,    0x0     );                      // Initialize
-  AD5940_WriteReg(REG_AFECON_CLKCON0,   0x440   );
-  AD5940_WriteReg(REG_AFE_ADCBUFCON,    0x5F3D04);
-  AD5940_WriteReg(REG_AFE_AFECON,       0x180040);                      // Initialize
-  AD5940Juul_HSOscillatorCtrl(pJuulCfg->HighSpeedOscClock);             // Set High Speed Oscillator Clock to 32 MHz or 16 MHz
-  AD5940Juul_ADCFilterCtrl(pJuulCfg->ADCFilterSampleRate);              // Use 800 KHz Sampling (0x1) or 1.6 MHz (0x10)
-  AD5940_WriteReg(REG_AFE_HSTIACON,     0x7C    );                      // High Power TIA
-  AD5940_WriteReg(REG_AFE_SWCON,        0x2FFFF );                      // Initialize
-  AD5940Juul_HSRtiaCtrl(pJuulCfg->RTIAValue);                           // Use 200 Ohm RTIA, No Capacitance
-  AD5940_WriteReg(REG_AFE_LPTIASW0,     0x3180  );                      // Initialize LPTIA
-  AD5940_INTCCfg(AFEINTC_1, AFEINTSRC_DFTRDY, bTRUE);                   // Enables interrupt which would indicate DFT (DFTREAL & DFTIMAG) is ready for reading
-  
-  /* Removed optional lines */
-  /* ADCBISCON register not present in data sheet/register library */
-  /* Reset values for ADCCON, BUFSENCON and ADCBISCON are 0x0, 0x37 and 0x0 respectively */
-  /* Removed the three register writes above due to input value already same with reset value */
+  AD5940_WriteReg(REG_AFE_PMBW,       0x821FD );        // High Power Mode
+  AD5940_WriteReg(REG_AFECON_CLKSEL,  0x0     );        // Initialize
+  AD5940_WriteReg(REG_AFECON_CLKCON0, 0x440   );
+  AD5940_WriteReg(REG_AFE_ADCBUFCON,  0x5F3D04);
+  AD5940_WriteReg(REG_AFE_AFECON,     0x180040);        // Initialize
 }
 
-void AD5940Juul_RtiaACMeasurement(int32_t RtiaAcCalibrationValues[4], AppJuulCfg_Type *pJuulCfg)
+/** Uninitialize AD5940 */
+void AD5940Juul_Deinit(void)
 {
-  int32_t temp_PGAGain = 0;                                             // Temporary storage for PGA Gain value
+  /* Performs reset to the device to turn off enabled processes */
+  AD5940_HWReset();
+}
 
-  /* Configure AD5940 for RCAL measurement */
-  AD5940_WriteReg(REG_AFE_SWCON, 0x28A11 );                             // Connect across Rcal
-  AD5940Juul_WaveGenFreqCtrl(pJuulCfg->WaveGenFreq, pJuulCfg->HighSpeedOscClock);                                     // 3355440 for 100 KHz Excitation Frequency; d’6710890 for 16 MHz Clk //SINEFCW in WGFCW, bits 0-23
-  AD5940Juul_WaveGenAmpCtrl(pJuulCfg->WaveGenAmp_Calibrate, pJuulCfg->InAmp_Calibrate, pJuulCfg->Atten_Calibrate);                            // 600 mV Excitation Voltage
-  AD5940_WriteReg(REG_AFE_HSDACCON, 0x80E);                             // InAmp = 2, Atten = False, 0x1B Update Rate fro HS/HP
-  AD5940_WriteReg(REG_AFE_WGCON, 0x34);                                 // Sine Wave
+/** Measurement Process for Load (or Rcal as load) and RTIA */
+void AD5940Juul_Measure(JuulMeasCfg_Type *pJuulCfg, JuulValues_Type *pJuulVal)
+{
+  /* Initialize Measurement */
+  AD5940Juul_HSOscillatorCtrl(pJuulCfg->HighSpeedOscClock);     // Set oscillator clock to 32 MHz or 16 MHz
+  AD5940Juul_ADCFilterCtrl(&pJuulCfg->ADCFilterCfg);            // Sets the sampling rate to 800 kHz or 1.6 MHz
+  AD5940_AFECtrlS(AFECTRL_HSTIAPWR, bTRUE);                     // AFE - Enables high power TIA
+  AD5940_WriteReg(REG_AFE_HSTIACON, 0x7C);                      // High Power TIA
+  AD5940_SWMatrixCfgS(&SWMatCfg_Init);                          // Initialize the switches
+  AD5940Juul_HSRtiaCtrl(pJuulCfg->RtiaValue);                   // Use 200 Ohm RTIA, No Capacitance
+  AD5940_WriteReg(REG_AFE_LPTIASW0, 0x3180);                    // Initialize LPTIA
+  AD5940_INTCCfg(AFEINTC_1, AFEINTSRC_DFTRDY, bTRUE);           // Enables interrupt which would indicate DFT (DFTREAL & DFTIMAG) is ready for reading
   
-  temp_PGAGain = 0x201424 | (pJuulCfg->PGAGain_Calibrate_Rcal << 16);   // Uses set .PGAGain for Rcal during RTIA AC calibration
-  AD5940_WriteReg(REG_AFE_ADCCON, temp_PGAGain);                        // Adds PGA Gain to fixed config of ADC Across Excitation Amp P-N and set register to the value
-  AD5940_WriteReg(REG_AFE_DFTCON, 0x200091);                            // ADC Raw Data, 2048 Sampling
-  AD5940_WriteReg(REG_AFE_AFECON, 0x184FC0);                            // ADC Idle
-  AD5940_Delay10us(20);                                                 // Added slight delay, referenced from BIA example
-  AD5940_WriteReg(REG_AFE_AFECON, 0x19CFC0);                            // Start ADC Conversion (has a disabled dc DAC buffer)
-  while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE);    // Wait for DFT interrupt which would indicate DFT is ready to be read
-  AD5940_WriteReg(REG_AFE_AFECON, 0x184FC0);                            // ADC Idle
-  AD5940_INTCClrFlag(AFEINTSRC_DFTRDY);                                 // Clears the recent DFT interrupt flag
+  /* Configure AD5940 for RCAL or Load measurement */
+  AD5940_SWMatrixCfgS(&pJuulCfg->SWMatrixCfg);                                          // Sets switches to connect to Rcal or Load
+  AD5940_AFECtrlS(AFECTRL_INAMPPWR | AFECTRL_EXTBUFPWR, bTRUE);                         // AFE - Turns ON instrumentation amplifier and excitation buffer
+  AD5940Juul_WaveGenFreqCtrl(pJuulCfg->WaveGenFreq, pJuulCfg->HighSpeedOscClock);       // Sets excitation buffer frequency - input based on High Speed Oscillator Clock speed
+  AD5940Juul_WaveGenAmpCtrl(pJuulCfg->WaveGenAmp, pJuulCfg->InAmp, pJuulCfg->AttenEn);  // Sets excitation buffer amplitude - input based on InAmp and Attenuation gains 
+  AD5940Juul_DACCtrl(pJuulCfg->InAmp, pJuulCfg->AttenEn);                               // Sets InAmp and attenuation gain                          
+  AD5940_WriteReg(REG_AFE_WGCON, 0x34);                                                 // Sine Wave
+  AD5940Juul_ADCCtrl(pJuulCfg->PGAGain_Load, RCAL_LOAD_MEASURE_STAGE);                  // Sets PGA gain for Rcal/Load measurement
+  AD5940Juul_DFTCtrl(&pJuulCfg->DFTCfg);                                                // Sets DFT input to ADC Raw Data and with 2048 Sampling
+  AD5940_AFECtrlS(AFECTRL_WG | AFECTRL_ADCCNV | AFECTRL_ADCPWR, bTRUE);                 // ADC Idle, AFE - turns ON waveform generator, ADC power and convert start
+  AD5940_Delay10us(25);
+  if(bTRUE == pJuulCfg->ADCFilterCfg.Sinc2NotchEnable)
+  {
+    AD5940_AFECtrlS(AFECTRL_SINC2NOTCH, bTRUE);                                         // AFE - enables sinc2
+  }
+  AD5940_AFECtrlS(AFECTRL_DFT, bTRUE);                                                  // Start ADC Conversion, AFE - enables DFT hardware accelerator
+  while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE);                    // Wait for DFT interrupt which would indicate DFT is ready to be read
+  AD5940_AFECtrlS(AFECTRL_SINC2NOTCH | AFECTRL_DFT, bFALSE);                            // ADC Idle, AFE - disables sinc2 and DFT hardware accelerator
+  AD5940_INTCClrFlag(AFEINTSRC_DFTRDY);                                                 // Clears the recent DFT interrupt flag
   
-  RtiaAcCalibrationValues[0] = AD5940_ReadAfeResult(AFERESULT_DFTREAL); // Reads register DFTREAL to get raw DFT real value
-  RtiaAcCalibrationValues[1] = AD5940_ReadAfeResult(AFERESULT_DFTIMAGE);// Reads register DFTIMAG to get raw DFT imaginary value
+  /* Read Rcal/Load Real and Imaginary component on DFT */
+  pJuulVal->DFTLoadReal = AD5940_ReadAfeResult(AFERESULT_DFTREAL);                      // Reads register DFTREAL to get DFT real value
+  pJuulVal->DFTLoadImag = AD5940_ReadAfeResult(AFERESULT_DFTIMAGE);                     // Reads register DFTIMAG to get DFT imaginary value
   
   /* Configure AD5940 for RTIA measurement */
-  temp_PGAGain = 0x200101 | (pJuulCfg->PGAGain_Calibrate_Rtia << 16);   // Uses set .PGAGain for RTIA during RTIA AC calibration
-  AD5940_WriteReg(REG_AFE_ADCCON, temp_PGAGain);                        // Adds PGA Gain to fixed config of ADC Across HPTIA P-N and set register to the value
-  AD5940_Delay10us(20);                                                 // Added slight delay, referenced from BIA example
-  AD5940_WriteReg(REG_AFE_AFECON, 0x19CFC0);                            // Start ADC Conversion (has a disabled dc DAC buffer)
-  while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE);    // Wait for DFT interrupt which would indicate DFT is ready to be read
-  AD5940_WriteReg(REG_AFE_AFECON, 0x184FC0);                            // ADC Idle
-  AD5940_INTCClrFlag(AFEINTSRC_DFTRDY);                                 // Clears the recent DFT interrupt flag
+  AD5940Juul_ADCCtrl(pJuulCfg->PGAGain_Rtia, RTIA_MEASURE_STAGE);                       // Sets PGA gain for RTIA measurement
+  AD5940_Delay10us(25);
+  {
+    AD5940_AFECtrlS(AFECTRL_SINC2NOTCH, bTRUE);                                         // AFE - enables sinc2
+  }
+  AD5940_AFECtrlS(AFECTRL_DFT, bTRUE);                                                  // Start ADC Conversion, AFE - enables DFT hardware accelerator
+  while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE);                    // Wait for DFT interrupt which would indicate DFT is ready to be read
+  AD5940_AFECtrlS(AFECTRL_SINC2NOTCH | AFECTRL_DFT, bFALSE);                            // ADC Idle, AFE - disables sinc2 and DFT hardware accelerator
+  AD5940_INTCClrFlag(AFEINTSRC_DFTRDY);                                                 // Clears the recent DFT interrupt flag
   
-  RtiaAcCalibrationValues[2] = AD5940_ReadAfeResult(AFERESULT_DFTREAL); // Reads register DFTREAL to get raw DFT real value
-  RtiaAcCalibrationValues[3] = AD5940_ReadAfeResult(AFERESULT_DFTIMAGE);// Reads register DFTIMAG to get raw DFT imaginary value
-  
-  /* Revert DFT output values which are 2's complemented */
-  AD5940Juul_Revert2sComplement(RtiaAcCalibrationValues);
-}
-
-void AD5940Juul_LoadMeasurement(int32_t LoadMeasurementValues[4], AppJuulCfg_Type *pJuulCfg)
-{
-  int32_t temp_PGAGain = 0;                                             // Temporary storage for PGA Gain value
-  
-  /* Configure AD5940 for Load measurement */
-  AD5940_WriteReg(REG_AFE_SWCON, 0x22955);                              // Connect across ZLoad
-  AD5940Juul_WaveGenAmpCtrl(pJuulCfg->WaveGenAmp_Calibrate, pJuulCfg->InAmp_Calibrate, pJuulCfg->Atten_Calibrate);                            // 15 mV Excitation Voltage
-  AD5940_WriteReg(REG_AFE_HSDACCON, 0x180F);                            // InAmp = 0.25, Atten = True, 0x1B Update Rate for HS/HP
-  
-  temp_PGAGain = 0x201424 | (pJuulCfg->PGAGain_LoadMeas_Load << 16);    // Uses set .PGAGain for Load during load measurement
-  AD5940_WriteReg(REG_AFE_ADCCON, temp_PGAGain);                        // Adds PGA Gain to fixed config of ADC Across Excitation Amp P-N and set register to the value
-  AD5940_WriteReg(REG_AFE_AFECON, 0x184FC0);                            // ADC Idle
-  AD5940_Delay10us(20);                                                 // Added slight delay, referenced from BIA example
-  AD5940_WriteReg(REG_AFE_AFECON, 0x19CFC0);                            // Start ADC Conversion (has a disabled dc DAC buffer)
-  while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE);    // Wait for DFT interrupt which would indicate DFT is ready to be read
-  AD5940_WriteReg(REG_AFE_AFECON, 0x184FC0);                            // ADC Idle
-  AD5940_INTCClrFlag(AFEINTSRC_DFTRDY);                                 // Clears the recent DFT interrupt flag
-  
-  LoadMeasurementValues[0] = AD5940_ReadAfeResult(AFERESULT_DFTREAL);   // Reads register DFTREAL to get raw DFT real value
-  LoadMeasurementValues[1] = AD5940_ReadAfeResult(AFERESULT_DFTIMAGE);  // Reads register DFTIMAG to get raw DFT imaginary value
-  
-  /* Configure AD5940 for RTIA measurement */
-  temp_PGAGain = 0x200101 | (pJuulCfg->PGAGain_LoadMeas_Rtia << 16);    // Uses set .PGAGain for RTIA during load measurement
-  AD5940_WriteReg(REG_AFE_ADCCON, temp_PGAGain);                        // Adds PGA Gain to fixed config of ADC Across HPTIA P-N and set register to the value
-  AD5940_Delay10us(20);                                                 // Added slight delay, referenced from BIA example
-  AD5940_WriteReg(REG_AFE_AFECON, 0x19CFC0);                            // Start ADC Conversion (has a disabled dc DAC buffer)
-  while(AD5940_INTCTestFlag(AFEINTC_1, AFEINTSRC_DFTRDY) == bFALSE);    // Wait for DFT interrupt which would indicate DFT is ready to be read
-  AD5940_WriteReg(REG_AFE_AFECON, 0x184FC0);                            // ADC Idle
-  AD5940_INTCClrFlag(AFEINTSRC_DFTRDY);                                 // Clears the recent DFT interrupt flag
-  
-  LoadMeasurementValues[2] = AD5940_ReadAfeResult(AFERESULT_DFTREAL);   // Reads register DFTREAL to get raw DFT real value
-  LoadMeasurementValues[3] = AD5940_ReadAfeResult(AFERESULT_DFTIMAGE);  // Reads register DFTIMAG to get raw DFT imaginary value
+  pJuulVal->DFTRtiaReal = AD5940_ReadAfeResult(AFERESULT_DFTREAL);                      // Reads register DFTREAL to get DFT real value
+  pJuulVal->DFTRtiaImag = AD5940_ReadAfeResult(AFERESULT_DFTIMAGE);                     // Reads register DFTIMAG to get DFT imaginary value
   
   /* Revert DFT output values which are 2's complemented */
-  AD5940Juul_Revert2sComplement(LoadMeasurementValues);
+  AD5940Juul_Revert2sComplement(pJuulVal);
 }
 
-void AD5940Juul_CalculateShowResult(int32_t RtiaAcCalibration_RawValues[4], int32_t LoadMeasurement_RawValues[4], AppJuulCfg_Type *pJuulCfg)
+/** Calculate Magnitude and Phase using DFT Results with PGA Gain */
+void AD5940Juul_CalculateDFTResults(JuulMeasCfg_Type *pJuulCfg, JuulValues_Type *pJuulVal)
 {
-  /* For Calculated Values */
-  double Rcal_Real,      Rcal_Imag;             // Rcal real and imaginary value
-  double Rtia_Cal_Real,  Rtia_Cal_Imag;         // RTIA real and imaginary value for the RTIA AC Calibration stage
-  double Load_Real,      Load_Imag;             // Load real and imaginary value
-  double Rtia_Meas_Real, Rtia_Meas_Imag;        // RTIA real and imaginary value for the Load Measurement stage
+  double Load_Real, Load_Imag;
+  double Rtia_Real, Rtia_Imag;
+  double temp;
   
-  double Rtia_Magnitude;                        // RTIA magnitude during RTIA AC Calibration
-  double Rtia_Phase;                            // RTIA phase during RTIA AC Calibration
-  double Load_Magnitude;                        // Load magnitude during Load Measurement
-  double Load_Phase;                            // Load phase during Load Measurement
+  /* List of PGA Gain Values */
+  double PGAGainList[5] = {PGA_GAIN_VAL_1, PGA_GAIN_VAL_1P5, PGA_GAIN_VAL_2, \
+                           PGA_GAIN_VAL_4, PGA_GAIN_VAL_9};
   
-  double PGA_Gain_List[5] = {1, 1.5, 2, 4, 9};  // List of available PGA Gains
-                                                // "pJuulCfg.PGAGain_x_x" are index values for register, "PGA_Gain_List" are the actual values
+  /* Calculation from DFT Value */
+  Load_Real = (double) pJuulVal->DFTLoadReal / PGAGainList[pJuulCfg->PGAGain_Load];
+  Load_Imag = (double) pJuulVal->DFTLoadImag / PGAGainList[pJuulCfg->PGAGain_Load];
+  Rtia_Real = (double) pJuulVal->DFTRtiaReal / PGAGainList[pJuulCfg->PGAGain_Rtia];
+  Rtia_Imag = (double) pJuulVal->DFTRtiaImag / PGAGainList[pJuulCfg->PGAGain_Rtia];
   
-  /* Calculation of Rtia Impedance */           //Divide DFT output by PGA Gain set at ".PGAGain_x_x"
-  Rcal_Real      = (double) RtiaAcCalibration_RawValues[0] / PGA_Gain_List[pJuulCfg->PGAGain_Calibrate_Rcal];
-  Rcal_Imag      = (double) RtiaAcCalibration_RawValues[1] / PGA_Gain_List[pJuulCfg->PGAGain_Calibrate_Rcal];
-  Rtia_Cal_Real  = (double) RtiaAcCalibration_RawValues[2] / PGA_Gain_List[pJuulCfg->PGAGain_Calibrate_Rtia];
-  Rtia_Cal_Imag  = (double) RtiaAcCalibration_RawValues[3] / PGA_Gain_List[pJuulCfg->PGAGain_Calibrate_Rtia];
-  
-  /* Calculation of Rtia Impedance */           //Divide DFT output by PGA Gain set at ".PGAGain_x_x"
-  Load_Real      = (double) LoadMeasurement_RawValues[0] / PGA_Gain_List[pJuulCfg->PGAGain_LoadMeas_Load];
-  Load_Imag      = (double) LoadMeasurement_RawValues[1] / PGA_Gain_List[pJuulCfg->PGAGain_LoadMeas_Load];
-  Rtia_Meas_Real = (double) LoadMeasurement_RawValues[2] / PGA_Gain_List[pJuulCfg->PGAGain_LoadMeas_Rtia];
-  Rtia_Meas_Imag = (double) LoadMeasurement_RawValues[3] / PGA_Gain_List[pJuulCfg->PGAGain_LoadMeas_Rtia];
-  
-  /* Calculation for the Magnitude and Phase */
-  Rtia_Magnitude = AD5940Juul_GetComplexMag(pJuulCfg->RcalValue, Rtia_Cal_Real, Rtia_Cal_Imag, Rcal_Real, Rcal_Imag);
-  Rtia_Phase     = AD5940Juul_GetComplexPhaseCalibrate(Rcal_Imag, Rtia_Cal_Imag, Rcal_Real, Rtia_Cal_Real);
-  Load_Magnitude = AD5940Juul_GetComplexMag(Rtia_Magnitude, Load_Real, Load_Imag, Rtia_Meas_Real, Rtia_Meas_Imag);
-  Load_Phase     = AD5940Juul_GetComplexPhaseMeasure(Load_Imag, Rtia_Meas_Imag, Load_Real, Rtia_Meas_Real, Rtia_Phase);
-  
-  /* Show Results through UART terminal */
-  printf("%.2f\t%.2f\t%.2f\t%.2f\n", Rtia_Magnitude, Rtia_Phase, Load_Magnitude, Load_Phase);
+  /* Calculation for Magnitude and Phase */
+  if(RTIA_AC_CAL_STAGE == pJuulVal->Stage)
+  {
+    /* Calculation for RTIA AC Calibration */
+    temp  = sqrt((Rtia_Real * Rtia_Real) + (Rtia_Imag * Rtia_Imag));
+    temp *= pJuulVal->RcalValue;
+    temp /= sqrt((Load_Real * Load_Real) + (Load_Imag * Load_Imag));
+    pJuulVal->RtiaMag = temp;                           // RTIA Magnitude
+    
+    temp = (Load_Imag + Rtia_Imag) / (Load_Real + Rtia_Real);
+    temp = atan(temp) * CONST_DEGREE_180 / MATH_PI;
+    pJuulVal->RtiaPhase = temp;                         // RTIA Phase
+  }
+  else
+  {
+    /* Calculation for Load Measurement */
+    temp  = sqrt((Load_Real * Load_Real) + (Load_Imag * Load_Imag));
+    temp *= pJuulVal->RtiaMag;
+    temp /= sqrt((Rtia_Real * Rtia_Real) + (Rtia_Imag * Rtia_Imag));
+    pJuulVal->LoadMag = temp;                           // Load Magnitude
+    
+    temp = (Load_Imag + Rtia_Imag) / (Load_Real + Rtia_Real);
+    temp = atan(temp) * CONST_DEGREE_180 / MATH_PI;
+    pJuulVal->LoadPhase = temp - pJuulVal->RtiaPhase;   // Load Phase
+  }
 }
 
-/* For setting Oscillator Clock Frequency for High Speed Oscillator */
+/** For reverting 2s complemented values read from DFT */
+void AD5940Juul_Revert2sComplement(JuulValues_Type *pJuulValues)
+{
+  int32_t DFTRawBit17;  // Indicator for 18th bit (bit 17) for basis of 2's complement
+  
+  DFTRawBit17 = pJuulValues->DFTLoadReal & BIT_17_MASK;
+  
+  if (DFTRawBit17 > 0)
+  {
+    pJuulValues->DFTLoadReal &= BIT_0_TO_16_MASK;
+    pJuulValues->DFTLoadReal -= BIT_17_MASK;
+  }
+  
+  DFTRawBit17 = pJuulValues->DFTLoadImag & BIT_17_MASK;
+  
+  if (DFTRawBit17 > 0)
+  {
+    pJuulValues->DFTLoadImag &= BIT_0_TO_16_MASK;
+    pJuulValues->DFTLoadImag -= BIT_17_MASK;
+  }
+  
+  DFTRawBit17 = pJuulValues->DFTRtiaReal & BIT_17_MASK;
+  
+  if (DFTRawBit17 > 0)
+  {
+    pJuulValues->DFTRtiaReal &= BIT_0_TO_16_MASK;
+    pJuulValues->DFTRtiaReal -= BIT_17_MASK;
+  }
+  
+  DFTRawBit17 = pJuulValues->DFTRtiaImag & BIT_17_MASK;
+  
+  if (DFTRawBit17 > 0)
+  {
+    pJuulValues->DFTRtiaImag &= BIT_0_TO_16_MASK;
+    pJuulValues->DFTRtiaImag -= BIT_17_MASK;
+  }
+}
+
+/** For setting Oscillator Clock Frequency for High Speed Oscillator */
 void AD5940Juul_HSOscillatorCtrl(uint8_t HSOscClk)
 {
-  uint32_t register_input = REGISTER_ALL_ZERO;
-  register_input = HPOSCCON_LOCK;
+  uint32_t reg_input = AD5940_ReadReg(REG_AFE_HPOSCCON);
+  reg_input |= BITM_AFE_HPOSCCON_LOCK;
   
-  if(HSOSCCLK_16MHZ == HSOscClk)
+  /* Sets oscillator clock */
+  if(HPOSCOUT_32MHZ == HSOscClk)
   {
-    register_input |= HPOSCCON_CLK32MHZEN | HPOSCCON_CHOPDIS;
+    reg_input &= ~(BITM_AFE_HPOSCCON_CHOPDIS | BITM_AFE_HPOSCCON_CLK32MHZEN);
+  }
+  else
+  {
+    reg_input |= BITM_AFE_HPOSCCON_CHOPDIS | BITM_AFE_HPOSCCON_CLK32MHZEN;
   }
   
-  AD5940_WriteReg(REG_AFE_HPOSCCON, register_input);
+  AD5940_WriteReg(REG_AFE_HPOSCCON, reg_input);
 }
 
-/* For setting Sampling Rate for ADC Filter */
-void AD5940Juul_ADCFilterCtrl(uint8_t ADCFltrSampleRate)
+/** For setting Sampling Rate for ADC Filter */
+void AD5940Juul_ADCFilterCtrl(ADCFilterCfg_Type *pADCFilterCfg)
 {
-  uint32_t register_input = REGISTER_ALL_ZERO;
+  uint32_t reg_input = REGISTER_RESET_TO_ZERO;
   
-  switch(ADCFltrSampleRate)
-  {
-  case ADCSAMPLERATE_800KHZ:
-    register_input = ADCFILTERCON_ADCSAMPLERATE;
-    break;
-    
-  case ADCSAMPLERATE_1P6MHZ:
-    register_input = (1L<<1);
-    break;
-  }
+  /* Apply ADC filter configurations */
+  reg_input |= pADCFilterCfg->ADCRate;
+  reg_input |= pADCFilterCfg->BpNotch             << BITP_AFE_ADCFILTERCON_LPFBYPEN;
+  reg_input |= pADCFilterCfg->BpSinc3             << BITP_AFE_ADCFILTERCON_SINC3BYP;
+  reg_input |= pADCFilterCfg->ADCSinc2Osr         << BITP_AFE_ADCFILTERCON_SINC2OSR;
+  reg_input |= pADCFilterCfg->ADCSinc3Osr         << BITP_AFE_ADCFILTERCON_SINC3OSR;
+  reg_input |= pADCFilterCfg->ADCAvgNum           << BITP_AFE_ADCFILTERCON_AVRGNUM;
+  reg_input |= pADCFilterCfg->Sinc2NotchClkEnable << BITP_AFE_ADCFILTERCON_SINC2CLKENB;
+  reg_input |= pADCFilterCfg->WGClkEnable         << BITP_AFE_ADCFILTERCON_DACWAVECLKENB;
+  reg_input |= pADCFilterCfg->DFTClkEnable        << BITP_AFE_ADCFILTERCON_DFTCLKENB;
   
-  AD5940_WriteReg(REG_AFE_ADCFILTERCON, register_input);
+  AD5940_WriteReg(REG_AFE_ADCFILTERCON, reg_input);
 }
 
-/* For setting RTIA Values */
+/** For setting RTIA Values */
 void AD5940Juul_HSRtiaCtrl(uint8_t RTIAValue)
 {
-  uint32_t register_input = REGISTER_ALL_ZERO;
-  register_input = (HSRTIACON_RTIACON & RTIAValue);
+  uint32_t reg_input = AD5940_ReadReg(REG_AFE_HSRTIACON);
   
-  AD5940_WriteReg(REG_AFE_HSRTIACON, register_input);
+  /* Sets chosen RTIA resistance */
+  reg_input &= ~BITM_AFE_HSRTIACON_RTIACON;
+  reg_input |= (BITM_AFE_HSRTIACON_RTIACON & RTIAValue);
+  
+  AD5940_WriteReg(REG_AFE_HSRTIACON, reg_input);
 }
 
-/* For setting Excitation Frequency of Waveform Generator */
+/** For setting Excitation Frequency of Waveform Generator */
 void AD5940Juul_WaveGenFreqCtrl(uint32_t WaveGenFreq, uint8_t HighSpeedOscClock)
 {
-  uint32_t register_input = REGISTER_ALL_ZERO;
+  /* Multiplies excitation frequency by 2^30 */
+  uint64_t reg_input = (uint64_t) WaveGenFreq * CONST_WAVE_GEN_FREQ;
   
-  switch(HighSpeedOscClock)
+  /* Divides by oscillator clock speed */
+  if(HPOSCOUT_32MHZ == HighSpeedOscClock)
   {
-  case HSOSCCLK_32MHZ:
-    register_input = WaveGenFreq * (1L<<30) / HSOSCCLK_VAL_32MHZ;
-    break;
-    
-  case HSOSCCLK_16MHZ:
-    register_input = WaveGenFreq * (1L<<30) / HSOSCCLK_VAL_16MHZ;
-    break;
+    reg_input /= HSOSCCLK_VAL_32MHZ;
+  }
+  else
+  {
+    reg_input /= HSOSCCLK_VAL_16MHZ;
   }
   
-  AD5940_WriteReg(REG_AFE_WGFCW, register_input);
+  AD5940_WriteReg(REG_AFE_WGFCW, (uint32_t) reg_input);
 }
 
-/* For setting Excitation Amplitude of Waveform Generator */
-void AD5940Juul_WaveGenAmpCtrl(uint32_t WaveGenAmp, uint8_t InAmp, uint8_t Atten)
+/** For setting Excitation Amplitude of Waveform Generator */
+void AD5940Juul_WaveGenAmpCtrl(float WaveGenAmp, float InAmp, float AttenEn)
 {
-  double register_input = REGISTER_ALL_ZERO;
+  /* Multiplies amplitude by 2047 / 808.8 */
+  double reg_input = WaveGenAmp * CONST_WAVE_GEN_AMP;
   
-  register_input = WaveGenAmp * 2047 / 808.8;
-  
-  switch(InAmp)
+  /* Divides by InAmp gain */
+  if(INAMP_GAIN_2 == InAmp)
   {
-  case INAMP_GAIN_2:
-    register_input /= INAMP_GAIN_VAL_2;
-    break;
-    
-  case INAMP_GAIN_0P25:
-    register_input /= INAMP_GAIN_VAL_0P25;
-    break;
+      reg_input /= INAMP_GAIN_2;
+  }
+  else
+  {
+      reg_input /= INAMP_GAIN_0P25;
   }
   
-  switch(Atten)
+  /* Divides by attenuation gain */
+  if(AttenEn)
   {
-  case DAC_ATTEN_DIS:
-    register_input /= DAC_ATTEN_DIS_GAINVAL;
-    break;
-    
-  case DAC_ATTEN_EN:
-    register_input /= DAC_ATTEN_EN_GAINVAL;
-    break;
+    reg_input /= DAC_ATTEN_EN_GAIN;
+  }
+  else
+  {
+    reg_input /= DAC_ATTEN_DIS_GAIN;
   }
   
-  AD5940_WriteReg(REG_AFE_WGAMPLITUDE, (uint32_t) register_input);
+  AD5940_WriteReg(REG_AFE_WGAMPLITUDE, (uint32_t) reg_input);
 }
 
-
-
-void AD5940Juul_Revert2sComplement(int32_t InputValue[4])
+/** For setting InAmp and Attenuation for DAC */
+void AD5940Juul_DACCtrl(float InAmp, float AttenEn)
 {
-  for (int8_t i = 0; i < 4; i++)
+  uint32_t reg_input = AD5940_ReadReg(REG_AFE_HSDACCON);
+  
+  /* Sets the DAC update rate and enables bandwidth of 250 kHz */
+  reg_input &= ~BITM_AFE_HSDACCON_RATE;
+  reg_input |= CONST_HSDACCON_ADCRATE << BITP_AFE_HSDACCON_RATE;
+  reg_input |= BITM_AFE_HSDACCON_BW250KEN;
+  
+  /* Sets instrumentation amplifier gain */
+  if(INAMP_GAIN_0P25 == InAmp)
   {
-    int32_t Bit_18 = InputValue[i] & (1L << 17);
-    
-    if (Bit_18 > 0)
-    {
-      InputValue[i] = (0x1FFFF) & InputValue[i];
-      InputValue[i] = InputValue[i] - (1L << 17);
-    }
+    reg_input |= BITM_AFE_HSDACCON_INAMPGNMDE;
   }
+  else
+  {
+    reg_input &= ~BITM_AFE_HSDACCON_INAMPGNMDE;
+  }
+  
+  /* Sets attenuation */
+  if(AttenEn)
+  {
+    reg_input |= BITM_AFE_HSDACCON_ATTENEN;
+  }
+  else
+  {
+    reg_input &= ~BITM_AFE_HSDACCON_ATTENEN;
+  }
+  
+  AD5940_WriteReg(REG_AFE_HSDACCON, reg_input);
 }
 
-/** Guide for Value Designation (Use Formula as Basis):
-    - Final Multiplier     = for the value multiplied after the squareroot and is outside the squareroot
-    - Real/ImagNumerator   = for values inside the squareroot above the fraction bar
-    - Real/ImagDenominator = for values inside the squareroot below the fraction bar
-*/
-double AD5940Juul_GetComplexMag(double FinalMultiplier, double RealNumerator,   double ImagNumerator, double RealDenominator, double ImagDenominator)       
+/** For setting PGA Gain for ADC */
+void AD5940Juul_ADCCtrl(uint8_t PGAGain, uint8_t Stage)
 {
-  double numerator;
-  double denominator;
-  double result;
+  uint32_t reg_input = AD5940_ReadReg(REG_AFE_ADCCON);
+  reg_input &= ~BITM_AFE_ADCCON_MUXSELP;
+  reg_input &= ~BITM_AFE_ADCCON_MUXSELN;
+  reg_input &= ~BITM_AFE_ADCCON_GNPGA;
   
-  numerator   = sqrt((RealNumerator   * RealNumerator  ) + (ImagNumerator   * ImagNumerator  ));
-  denominator = sqrt((RealDenominator * RealDenominator) + (ImagDenominator * ImagDenominator));
-  result = FinalMultiplier * numerator / denominator;
+  /* Sets Anti-alias Filter to 250 kHz */
+  reg_input |= AAFFMDE_250KHZ << BITP_AFE_ADCCON_AAFFMDE;
   
-  return result;
+  if(RCAL_LOAD_MEASURE_STAGE == Stage)
+  {
+    /* Sets excitation nodes as input */
+    reg_input |= ADCMUXP_P_NODE << BITP_AFE_ADCCON_MUXSELP;
+    reg_input |= ADCMUXN_N_NODE << BITP_AFE_ADCCON_MUXSELN;
+  }
+  else
+  {
+    /* Sets HPTIA nodes as input */
+    reg_input |= ADCMUXP_HSTIA_P << BITP_AFE_ADCCON_MUXSELP;
+    reg_input |= ADCMUXN_HSTIA_N << BITP_AFE_ADCCON_MUXSELN;
+  }
+  
+  /* Sets PGA Gain */
+  reg_input |= PGAGain << BITP_AFE_ADCCON_GNPGA;
+  
+  AD5940_WriteReg(REG_AFE_ADCCON, reg_input);
 }
 
-/** Guide for Value Designation (Use Formula as Basis):
-    - Real1/2 = for the real values found below the fraction bar, can be interchanged
-    - Imag1/2 = for the imaginary values found above the fraction bar, can be interchanged
-*/
-double AD5940Juul_GetComplexPhaseCalibrate(double Real1, double Real2, double Imag1, double Imag2)
+/** For setting ADC samples and source for DFT */
+void AD5940Juul_DFTCtrl(DFTCfg_Type *pDFTCfg)
 {
-  double temp;
+  uint32_t reg_input_adcfilter = AD5940_ReadReg(REG_AFE_ADCFILTERCON);
+  uint32_t reg_input_dft = AD5940_ReadReg(REG_AFE_DFTCON);
   
-  temp = (Real1 + Real2) / (Imag1 + Imag2);
-  temp = atan(temp) * 180 / MATH_PI;
+  if(DFTSRC_AVG == pDFTCfg->DftSrc)
+  {
+    /* Enable averaging for ADC filter */
+    reg_input_adcfilter |= BITM_AFE_ADCFILTERCON_AVRGEN;
+  }
+  else
+  {
+    /* Disable averaging for ADC filter */
+    reg_input_adcfilter &= ~BITM_AFE_ADCFILTERCON_AVRGEN;
   
-  return temp;
+    /* Sets DFT input */
+    reg_input_dft |= pDFTCfg->DftSrc << BITP_AFE_DFTCON_DFTINSEL;
+  }
+  
+  /* Enables hanning window */
+  reg_input_dft |= BITM_AFE_DFTCON_HANNINGEN;
+  
+  /* Sets ADC samples */
+  reg_input_dft &= ~BITM_AFE_DFTCON_DFTNUM;
+  reg_input_dft |= pDFTCfg->DftNum << BITP_AFE_DFTCON_DFTNUM;
+  
+  AD5940_WriteReg(REG_AFE_ADCFILTERCON, reg_input_adcfilter);
+  AD5940_WriteReg(REG_AFE_DFTCON, reg_input_dft);
 }
-
-double AD5940Juul_GetComplexPhaseMeasure(double Real1, double Real2, double Imag1, double Imag2, double Theta)
-{
-  double temp;
-  
-  temp = (Real1 + Real2) / (Imag1 + Imag2);
-  temp = atan(temp) * 180 / MATH_PI;
-  temp = temp - Theta;
-  
-  return temp;
-}
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
