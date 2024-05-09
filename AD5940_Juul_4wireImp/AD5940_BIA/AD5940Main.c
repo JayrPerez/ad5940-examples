@@ -85,33 +85,36 @@ JuulValues_Type JuulValues =
 };
 
 void AD5940_Main(void)
-{  
-  /* Initialize the setup */
-  AD5940Juul_Initialization();
-  
-  /* Set as indicator to use configuration and formula for RTIA AC Calibration */
-  JuulValues.Stage = RTIA_AC_CAL_STAGE;
-  
-  /* Measuring Across Rcal and TIA */
-  AD5940Juul_Measure(&JuulCfg_RtiaACCal, &JuulValues);
-  
-  /* Calculation of RTIA Impedance */
-  AD5940Juul_CalculateDFTResults(&JuulCfg_RtiaACCal, &JuulValues);
-  
-  /* Set as indicator to use configuration and formula for Load Measurement */
-  JuulValues.Stage = LOAD_MEAS_STAGE;
-  
-  /* Measuring Across Load and TIA */
-  AD5940Juul_Measure(&JuulCfg_LoadMeas, &JuulValues);
-  
-  /* Calculation of Load Impedance */
-  AD5940Juul_CalculateDFTResults(&JuulCfg_LoadMeas, &JuulValues);
-  
-  /* Show Results to UART Terminal */
-  printf("RTIA_M\tRTIA_P\tLoad_M\tLoad_P\n");   // UART terminal outputs' header
-  printf("%.2f\t%.2f\t%.2f\t%.2f\n", 
-         JuulValues.RtiaMag, JuulValues.RtiaPhase, \
-         JuulValues.LoadMag, JuulValues.LoadPhase);
+{ 
+  for (uint8_t run = 0; run < 100; run++)
+  {
+    /* Initialize the setup */
+    AD5940Juul_Initialization();
+    
+    /* Set as indicator to use configuration and formula for RTIA AC Calibration */
+    JuulValues.Stage = RTIA_AC_CAL_STAGE;
+    
+    /* Measuring Across Rcal and TIA */
+    AD5940Juul_Measure(&JuulCfg_RtiaACCal, &JuulValues);
+    
+    /* Calculation of RTIA Impedance */
+    AD5940Juul_CalculateDFTResults(&JuulCfg_RtiaACCal, &JuulValues);
+    
+    /* Set as indicator to use configuration and formula for Load Measurement */
+    JuulValues.Stage = LOAD_MEAS_STAGE;
+    
+    /* Measuring Across Load and TIA */
+    AD5940Juul_Measure(&JuulCfg_LoadMeas, &JuulValues);
+    
+    /* Calculation of Load Impedance */
+    AD5940Juul_CalculateDFTResults(&JuulCfg_LoadMeas, &JuulValues);
+    
+    /* Show Results to UART Terminal */
+    printf("RTIA_M\tRTIA_P\tLoad_M\tLoad_P\n");   // UART terminal outputs' header
+    printf("%.2f\t%.2f\t%.2f\t%.2f\n", 
+           JuulValues.RtiaMag, JuulValues.RtiaPhase, \
+           JuulValues.LoadMag, JuulValues.LoadPhase);
+  }
   
   AD5940Juul_Deinit();
 }
